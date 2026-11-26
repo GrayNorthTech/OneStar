@@ -3,8 +3,26 @@ import path from 'path';
 import Database from 'better-sqlite3';
 import mysql from 'mysql2/promise';
 import crypto from 'crypto';
+import { hashPassword } from './password.ts';
 
 export type DbDialect = 'mysql' | 'sqlite';
+
+export interface OwnerConfig {
+  email: string;
+  name: string;
+  passcode: string;
+  forceSyncPasscode: boolean;
+}
+
+export function getOwnerConfig(): OwnerConfig {
+  const rawEmail = (process.env.OWNER_EMAIL || '').trim().toLowerCase();
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawEmail);
+  const email = isValidEmail ? rawEmail : 'dylan@kortrix.com';
+  const name = (process.env.OWNER_NAME || '').trim() || 'Dylan';
+  const passcode = (process.env.OWNER_ADMIN_PASSCODE || '').trim();
+  const forceSyncPasscode = String(process.env.OWNER_PASSCODE_SYNC || '').trim().toLowerCase() === 'true';
+  return { email, name, passcode, forceSyncPasscode };
+}
 
 export interface DbStatus {
   dialect: DbDialect;
@@ -940,6 +958,8 @@ class UnifiedDatabase {
   private async seedCorporateDefaults(): Promise<void> {
     const now = new Date().toISOString();
 
+    const owner = getOwnerConfig();
+
     // 1. Company Settings (Official KORTRIX defaults — not an LLC until formation completed)
     const existingSettings = await this.queryOne('SELECT id FROM company_settings WHERE id = ?', ['default']);
     if (!existingSettings) {
@@ -957,7 +977,7 @@ class UnifiedDatabase {
           'Pre-Formation (LLC Registration Pending)',
           'https://kortrix.com',
           'TheGrayUSA',
-          'dylan@kortrix.com',
+          owner.email,
           '336.686.4728',
           'North Carolina',
           'America/New_York',
@@ -1083,27 +1103,53 @@ class UnifiedDatabase {
       }
     }
 
-    // 4. Founder Account ONLY (No fictional employees)
-    const founder = await this.queryOne('SELECT id FROM users WHERE email = ?', ['dylan@kortrix.com']);
+    // 4. Founder / Owner Account ONLY (No fictional employees)
+    // Automatically creates the Owner row and persists a salted scrypt hash when OWNER_ADMIN_PASSCODE is configured.
+    const founder =
+      (await this.queryOne<any>('SELECT id, email, full_name, password_hash, status FROM users WHERE id = ?', ['user-founder'])) ||
+      (await this.queryOne<any>('SELECT id, email, full_name, password_hash, status FROM users WHERE LOWER(email) = ?', [owner.email]));
+
     if (!founder) {
+      const initialHash = owner.passcode ? hashPassword(owner.passcode) : null;
       await this.execute(
         `INSERT INTO users (
           id, email, full_name, position, department_id, role_id,
           employment_classification, responsibilities, password_hash, status, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 'Active', ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?, ?)`,
         [
           'user-founder',
-          'dylan@kortrix.com',
-          'Dylan',
+          owner.email,
+          owner.name,
           'Founder',
           'dept-exec',
           'role-owner',
           'Founder / Principal',
           'Executive leadership, infrastructure operations, security architecture, and platform administration.',
+          initialHash,
           now,
           now,
         ]
       );
+      console.log(`[KORTRIX DB] Seeded Owner account (${owner.email}) in ${this.dialect}${initialHash ? ' with hashed credentials' : ''}.`);
+    } else {
+      // Reconcile OWNER_EMAIL override if changed and no conflicting account holds that address
+      if (founder.email.toLowerCase() !== owner.email) {
+        const conflict = await this.queryOne<any>('SELECT id FROM users WHERE LOWER(email) = ? AND id != ?', [owner.email, founder.id]);
+        if (!conflict) {
+          await this.execute('UPDATE users SET email = ?, updated_at = ? WHERE id = ?', [owner.email, now, founder.id]);
+        }
+      }
+      // Persist salted scrypt hash into users.password_hash when OWNER_ADMIN_PASSCODE is set
+      if (owner.passcode && (!founder.password_hash || owner.forceSyncPasscode)) {
+        const syncedHash = hashPassword(owner.passcode);
+        await this.execute('UPDATE users SET password_hash = ?, status = ?, updated_at = ? WHERE id = ?', [
+          syncedHash,
+          'Active',
+          now,
+          founder.id,
+        ]);
+        console.log(`[KORTRIX DB] Synced hashed Owner credentials for ${owner.email} in ${this.dialect}.`);
+      }
     }
 
     // 5. Default Document Categories (Folders)

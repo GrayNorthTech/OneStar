@@ -1,6 +1,7 @@
--- KORTRIX ONE — MySQL / MariaDB Schema (cPanel Ready)
--- Run in cPanel phpMyAdmin OR let KORTRIX ONE auto-bootstrap these tables on startup
--- once MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, and MYSQL_DATABASE are set.
+-- KORTRIX ONE — Complete MySQL / MariaDB Schema & Corporate Seed (cPanel phpMyAdmin Ready)
+-- Import this file in cPanel phpMyAdmin to create all 23 tables and idempotently seed
+-- the Owner account (dylan@kortrix.com), roles, departments, services, and launch roadmap.
+-- Note: On first server boot, KORTRIX ONE also auto-seeds and hashes OWNER_ADMIN_PASSCODE.
 
 CREATE TABLE IF NOT EXISTS departments (
   id VARCHAR(64) PRIMARY KEY,
@@ -402,3 +403,204 @@ CREATE TABLE IF NOT EXISTS integrations (
   config_json TEXT,
   updated_at VARCHAR(40) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- =============================================================================
+-- SECTION 2: OFFICIAL KORTRIX CORPORATE SEED DATA (IDEMPOTENT)
+-- Safe to re-run in cPanel phpMyAdmin. Uses INSERT IGNORE so existing records
+-- and customized settings are never overwritten.
+-- Zero fictional customers, employees, revenue, or test records are included.
+-- =============================================================================
+
+SET @seed_ts = DATE_FORMAT(UTC_TIMESTAMP(), '%Y-%m-%dT%H:%i:%s.000Z');
+SET @seed_date = DATE_FORMAT(UTC_TIMESTAMP(), '%Y-%m-%d');
+
+-- 1. Company Settings (Official KORTRIX Defaults)
+INSERT IGNORE INTO company_settings (
+  id, company_name, legal_status, website, affiliation, primary_email, telephone,
+  region, timezone, currency, brand_color, logo_data_url, business_address, mailing_address,
+  tax_rate, tax_label, customer_prefix, ticket_prefix, work_order_prefix, asset_prefix,
+  quote_prefix, invoice_prefix, document_prefix, business_hours_json, notification_prefs_json,
+  asset_grading_json, default_theme, updated_at
+) VALUES (
+  'default',
+  'KORTRIX',
+  'Pre-Formation (LLC Registration Pending)',
+  'https://kortrix.com',
+  'TheGrayUSA',
+  'dylan@kortrix.com',
+  '336.686.4728',
+  'North Carolina',
+  'America/New_York',
+  'USD',
+  '#0047FF',
+  '',
+  'North Carolina, United States',
+  'North Carolina, United States',
+  0,
+  'NC Sales Tax (Configure Once Registered)',
+  'KTX-CUS',
+  'KTX-TKT',
+  'KTX-WO',
+  'KTX-AST',
+  'KTX-QUO',
+  'KTX-INV',
+  'KTX-DOC',
+  '{"monday":"09:00 - 17:00","tuesday":"09:00 - 17:00","wednesday":"09:00 - 17:00","thursday":"09:00 - 17:00","friday":"09:00 - 17:00","saturday":"By Appointment","sunday":"Closed"}',
+  '{"ticketCreated":true,"workOrderAssigned":true,"quoteAccepted":true,"invoiceOverdue":true,"securityAuditAlerts":true}',
+  '[{"grade":"Grade A","label":"Like New / Mint","criteria":"Fully functional, negligible cosmetic wear, passes full hardware diagnostics."},{"grade":"Grade B","label":"Good / Refurbished","criteria":"Fully functional, minor light surface wear, verified storage & memory."},{"grade":"Grade C","label":"Fair / Operational","criteria":"Functional with visible cosmetic scuffs or battery wear under 80%."},{"grade":"Grade D","label":"Repair / Parts Only","criteria":"Hardware fault present; queued for repair, salvage, or disposition."}]',
+  'light',
+  @seed_ts
+);
+
+-- 2. Official Departments (9)
+INSERT IGNORE INTO departments (id, name, code, description, active, created_at, updated_at) VALUES
+  ('dept-exec', 'Executive Leadership', 'EXEC', 'Corporate governance, strategy, and executive oversight.', 1, @seed_ts, @seed_ts),
+  ('dept-admin', 'Corporate Administration', 'ADMN', 'Legal, compliance, documentation, and internal administration.', 1, @seed_ts, @seed_ts),
+  ('dept-ops', 'Operations', 'OPS', 'Service delivery, scheduling, dispatch, and operational workflows.', 1, @seed_ts, @seed_ts),
+  ('dept-infra', 'Infrastructure', 'INFR', 'Residential IT, business IT, networking, servers, and cloud systems.', 1, @seed_ts, @seed_ts),
+  ('dept-sec', 'Security', 'SEC', 'Endpoint protection, remediation, assessments, and backup recovery.', 1, @seed_ts, @seed_ts),
+  ('dept-life', 'Lifecycle', 'LIFE', 'ITAM, auditing, refurbishment, and asset disposition coordination.', 1, @seed_ts, @seed_ts),
+  ('dept-dev', 'Software Development', 'DEV', 'Internal platforms, KORTRIX ONE engineering, and integrations.', 1, @seed_ts, @seed_ts),
+  ('dept-sales', 'Sales & Marketing', 'SALE', 'Client acquisition, proposals, branding, and lead pipeline.', 1, @seed_ts, @seed_ts),
+  ('dept-fin', 'Finance', 'FIN', 'Quotations, invoicing, expense tracking, and financial operations.', 1, @seed_ts, @seed_ts);
+
+-- 3. Official Roles & Granular Module Permissions (10)
+INSERT IGNORE INTO roles (id, name, description, is_system, permissions_json, created_at, updated_at) VALUES
+  ('role-owner', 'Owner', 'Unrestricted platform ownership, governance, and security authority.', 1,
+   '{"dashboard":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"crm":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"service_desk":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"work_orders":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"service_catalog":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"assets":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"documents":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"projects":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"finance":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"employees":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"admin":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true}}',
+   @seed_ts, @seed_ts),
+  ('role-exec', 'Executive', 'Executive leadership visibility and cross-departmental management.', 1,
+   '{"dashboard":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":false},"crm":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":false},"service_desk":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":false},"work_orders":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":false},"service_catalog":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":false},"assets":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":false},"documents":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":false},"projects":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":false},"finance":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":false},"employees":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":false},"admin":{"view":true,"create":true,"edit":true,"delete":false,"export":true,"admin":true}}',
+   @seed_ts, @seed_ts),
+  ('role-admin', 'Administrator', 'System administration, user provisioning, and security configuration.', 1,
+   '{"dashboard":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"crm":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"service_desk":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"work_orders":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"service_catalog":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"assets":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"documents":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"projects":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"finance":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"employees":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true},"admin":{"view":true,"create":true,"edit":true,"delete":true,"export":true,"admin":true}}',
+   @seed_ts, @seed_ts),
+  ('role-manager', 'Manager', 'Departmental operations oversight across teams and customers.', 1,
+   '{"dashboard":{"view":true,"create":true,"edit":true,"delete":false,"export":true,"admin":false},"crm":{"view":true,"create":true,"edit":true,"delete":false,"export":true,"admin":false},"service_desk":{"view":true,"create":true,"edit":true,"delete":false,"export":true,"admin":false},"work_orders":{"view":true,"create":true,"edit":true,"delete":false,"export":true,"admin":false},"service_catalog":{"view":true,"create":true,"edit":true,"delete":false,"export":true,"admin":false},"assets":{"view":true,"create":true,"edit":true,"delete":false,"export":true,"admin":false},"documents":{"view":true,"create":true,"edit":true,"delete":false,"export":true,"admin":false},"projects":{"view":true,"create":true,"edit":true,"delete":false,"export":true,"admin":false},"finance":{"view":true,"create":true,"edit":true,"delete":false,"export":true,"admin":false},"employees":{"view":true,"create":true,"edit":true,"delete":false,"export":true,"admin":false},"admin":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false}}',
+   @seed_ts, @seed_ts),
+  ('role-tech', 'Technician', 'Field and remote service execution, work orders, tickets, and assets.', 1,
+   '{"dashboard":{"view":true,"create":true,"edit":true,"delete":false,"export":false,"admin":false},"crm":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"service_desk":{"view":true,"create":true,"edit":true,"delete":false,"export":false,"admin":false},"work_orders":{"view":true,"create":true,"edit":true,"delete":false,"export":false,"admin":false},"service_catalog":{"view":true,"create":true,"edit":true,"delete":false,"export":false,"admin":false},"assets":{"view":true,"create":true,"edit":true,"delete":false,"export":false,"admin":false},"documents":{"view":true,"create":true,"edit":true,"delete":false,"export":false,"admin":false},"projects":{"view":true,"create":true,"edit":true,"delete":false,"export":false,"admin":false},"finance":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"employees":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"admin":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false}}',
+   @seed_ts, @seed_ts),
+  ('role-support', 'Support Specialist', 'Service desk triage, customer communication, and scheduling.', 1,
+   '{"dashboard":{"view":true,"create":true,"edit":true,"delete":false,"export":false,"admin":false},"crm":{"view":true,"create":true,"edit":true,"delete":false,"export":false,"admin":false},"service_desk":{"view":true,"create":true,"edit":true,"delete":false,"export":false,"admin":false},"work_orders":{"view":true,"create":true,"edit":true,"delete":false,"export":false,"admin":false},"service_catalog":{"view":true,"create":true,"edit":true,"delete":false,"export":false,"admin":false},"assets":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"documents":{"view":true,"create":true,"edit":true,"delete":false,"export":false,"admin":false},"projects":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"finance":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"employees":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"admin":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false}}',
+   @seed_ts, @seed_ts),
+  ('role-sales', 'Sales Representative', 'CRM pipeline, leads, customer onboarding, and quotations.', 1,
+   '{"dashboard":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"crm":{"view":true,"create":true,"edit":true,"delete":false,"export":true,"admin":false},"service_desk":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"work_orders":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"service_catalog":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"assets":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"documents":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"projects":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"finance":{"view":true,"create":true,"edit":true,"delete":false,"export":false,"admin":false},"employees":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"admin":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false}}',
+   @seed_ts, @seed_ts),
+  ('role-finance', 'Finance', 'Quotations, invoicing, expense recording, and financial summaries.', 1,
+   '{"dashboard":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"crm":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"service_desk":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"work_orders":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"service_catalog":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"assets":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"documents":{"view":true,"create":true,"edit":false,"delete":false,"export":false,"admin":false},"projects":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"finance":{"view":true,"create":true,"edit":true,"delete":false,"export":true,"admin":false},"employees":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"admin":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false}}',
+   @seed_ts, @seed_ts),
+  ('role-employee', 'Employee', 'Internal corporate access to projects, tasks, and shared documentation.', 1,
+   '{"dashboard":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"crm":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"service_desk":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"work_orders":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"service_catalog":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"assets":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"documents":{"view":true,"create":true,"edit":false,"delete":false,"export":false,"admin":false},"projects":{"view":true,"create":true,"edit":true,"delete":false,"export":false,"admin":false},"finance":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"employees":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"admin":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false}}',
+   @seed_ts, @seed_ts),
+  ('role-readonly', 'Read Only', 'Auditing and read-only visibility without mutation permissions.', 1,
+   '{"dashboard":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"crm":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"service_desk":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"work_orders":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"service_catalog":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"assets":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"documents":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"projects":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"finance":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"employees":{"view":true,"create":false,"edit":false,"delete":false,"export":false,"admin":false},"admin":{"view":false,"create":false,"edit":false,"delete":false,"export":false,"admin":false}}',
+   @seed_ts, @seed_ts);
+
+-- 4. Founder / Owner Account ONLY (Zero plaintext passwords in SQL)
+-- password_hash is automatically populated with a salted scrypt hash on first
+-- server boot when OWNER_ADMIN_PASSCODE is set in your server environment, OR
+-- you can generate a ready-to-paste phpMyAdmin UPDATE statement via:
+--   npm run owner:sql
+INSERT IGNORE INTO users (
+  id, email, full_name, position, department_id, role_id,
+  employment_classification, responsibilities, password_hash, status, created_at, updated_at
+) VALUES (
+  'user-founder',
+  'dylan@kortrix.com',
+  'Dylan',
+  'Founder',
+  'dept-exec',
+  'role-owner',
+  'Founder / Principal',
+  'Executive leadership, infrastructure operations, security architecture, and platform administration.',
+  NULL,
+  'Active',
+  @seed_ts,
+  @seed_ts
+);
+
+-- 5. Default Document Categories (9)
+INSERT IGNORE INTO document_folders (id, name, category, parent_id, allowed_departments_json, created_by, created_at) VALUES
+  ('folder-corporate-legal', 'Corporate & Legal', 'Corporate & Legal', NULL, '[]', 'user-founder', @seed_ts),
+  ('folder-finance-accounting', 'Finance & Accounting', 'Finance & Accounting', NULL, '[]', 'user-founder', @seed_ts),
+  ('folder-operations', 'Operations', 'Operations', NULL, '[]', 'user-founder', @seed_ts),
+  ('folder-services-pricing', 'Services & Pricing', 'Services & Pricing', NULL, '[]', 'user-founder', @seed_ts),
+  ('folder-branding-marketing', 'Branding & Marketing', 'Branding & Marketing', NULL, '[]', 'user-founder', @seed_ts),
+  ('folder-technology-development', 'Technology & Development', 'Technology & Development', NULL, '[]', 'user-founder', @seed_ts),
+  ('folder-customers-contracts', 'Customers & Contracts', 'Customers & Contracts', NULL, '[]', 'user-founder', @seed_ts),
+  ('folder-policies-compliance', 'Policies & Compliance', 'Policies & Compliance', NULL, '[]', 'user-founder', @seed_ts),
+  ('folder-human-resources', 'Human Resources', 'Human Resources', NULL, '[]', 'user-founder', @seed_ts);
+
+-- 6. Official KORTRIX Service Catalog (19 Services — Unpriced Drafts)
+INSERT IGNORE INTO services (
+  id, service_code, name, division, description, included_work, exclusions,
+  pricing_model, price, estimated_duration, delivery_mode, tax_classification,
+  active, publication_status, created_at, updated_at
+) VALUES
+  ('svc-inf-001', 'INF-001', 'Residential technical support', 'KORTRIX Infrastructure', 'Hands-on troubleshooting, OS configuration, software maintenance, and technical assistance for home environments.', '', '', 'Hourly', NULL, '', 'On-Site & Remote', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-inf-002', 'INF-002', 'Computer and device support', 'KORTRIX Infrastructure', 'Diagnostics, hardware upgrades, OS installation, performance optimization, and workstation setup.', '', '', 'Fixed Price', NULL, '', 'On-Site & Remote', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-inf-003', 'INF-003', 'Home networking and Wi-Fi', 'KORTRIX Infrastructure', 'Router and mesh deployment, coverage optimization, structured wiring troubleshooting, and secure wireless configuration.', '', '', 'Custom Quote', NULL, '', 'On-Site Only', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-inf-004', 'INF-004', 'TV and audio technology', 'KORTRIX Infrastructure', 'Smart display configuration, home audio integration, streaming hardware setup, and cable management.', '', '', 'Fixed Price', NULL, '', 'On-Site Only', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-inf-005', 'INF-005', 'Managed business IT', 'KORTRIX Infrastructure', 'Ongoing operational support, workstation lifecycle oversight, patch management, and SLA-backed IT administration.', '', '', 'Recurring', NULL, '', 'On-Site & Remote', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-inf-006', 'INF-006', 'Network infrastructure', 'KORTRIX Infrastructure', 'Commercial switching, firewalls, VLAN segmentation, VPN connectivity, and structured network architecture.', '', '', 'Custom Quote', NULL, '', 'On-Site & Remote', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-inf-007', 'INF-007', 'Server and cloud services', 'KORTRIX Infrastructure', 'On-premises server administration, virtualization, Microsoft 365 tenant engineering, and hybrid cloud infrastructure.', '', '', 'Custom Quote', NULL, '', 'On-Site & Remote', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-inf-008', 'INF-008', 'Software and integrations', 'KORTRIX Infrastructure', 'Business application deployment, license alignment, API integration planning, and internal workflow tooling.', '', '', 'Hourly', NULL, '', 'Remote Only', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-sec-001', 'SEC-001', 'Malware remediation', 'KORTRIX Security', 'Containment, removal of malicious software, system integrity verification, and post-incident hardening.', '', '', 'Fixed Price', NULL, '', 'On-Site & Remote', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-sec-002', 'SEC-002', 'Endpoint protection', 'KORTRIX Security', 'Deployment and policy configuration of enterprise antivirus, EDR agents, and device encryption.', '', '', 'Per Device', NULL, '', 'On-Site & Remote', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-sec-003', 'SEC-003', 'Security assessments', 'KORTRIX Security', 'Structured review of network posture, identity controls, access policies, and prioritized remediation roadmaps.', '', '', 'Custom Quote', NULL, '', 'On-Site & Remote', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-sec-004', 'SEC-004', 'Account security', 'KORTRIX Security', 'MFA rollout, conditional access configuration, account recovery hygiene, and identity protection.', '', '', 'Per User', NULL, '', 'Remote Only', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-sec-005', 'SEC-005', 'Backup and recovery', 'KORTRIX Security', '3-2-1 backup architecture, cloud and local redundancy verification, and disaster recovery readiness.', '', '', 'Recurring', NULL, '', 'On-Site & Remote', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-lif-001', 'LIF-001', 'IT asset management', 'KORTRIX Lifecycle', 'Inventory registration, asset tagging, warranty tracking, and lifecycle reporting for organizational hardware.', '', '', 'Per Device', NULL, '', 'On-Site & Remote', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-lif-002', 'LIF-002', 'Device deployment', 'KORTRIX Lifecycle', 'Standardized imaging, enrollment, peripheral staging, and end-user desk readiness.', '', '', 'Per Device', NULL, '', 'On-Site & Remote', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-lif-003', 'LIF-003', 'Equipment auditing', 'KORTRIX Lifecycle', 'Physical hardware verification, serial reconciliation, condition grading, and retirement eligibility reviews.', '', '', 'Custom Quote', NULL, '', 'On-Site Only', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-lif-004', 'LIF-004', 'Equipment refurbishment', 'KORTRIX Lifecycle', 'Component testing, storage replacement, cleaning, OS reload, and grading for secondary deployment.', '', '', 'Per Device', NULL, '', 'On-Site Only', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-lif-005', 'LIF-005', 'Asset disposition coordination', 'KORTRIX Lifecycle', 'Chain-of-custody documentation, decommissioning logistics, and coordination with certified recycling partners.', '', '', 'Custom Quote', NULL, '', 'On-Site Only', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts),
+  ('svc-lif-006', 'LIF-006', 'Data sanitization coordination', 'KORTRIX Lifecycle', 'Coordinated media wiping workflows and custody documentation prior to hardware reuse or partner disposal.', '', '', 'Per Device', NULL, '', 'On-Site Only', 'Taxable Service', 1, 'Draft', @seed_ts, @seed_ts);
+
+-- 7. KORTRIX Company Launch Roadmap Project & Tasks (19)
+INSERT IGNORE INTO projects (id, name, code, description, category, status, owner_id, start_date, target_date, created_at, updated_at) VALUES (
+  'proj-kortrix-launch',
+  'KORTRIX Company Launch',
+  'KTX-PRJ-001',
+  'Official foundational corporate launch roadmap tracking infrastructure, legal formation readiness, service catalog finalization, and operational launch milestones.',
+  'Corporate Roadmap',
+  'Active',
+  'user-founder',
+  @seed_date,
+  NULL,
+  @seed_ts,
+  @seed_ts
+);
+
+INSERT IGNORE INTO tasks (id, project_id, title, description, status, priority, assigned_user_id, sort_order, completed_at, created_at, updated_at) VALUES
+  ('task-launch-1', 'proj-kortrix-launch', 'Establish company name', '', 'Completed', 'Normal', 'user-founder', 1, @seed_ts, @seed_ts, @seed_ts),
+  ('task-launch-2', 'proj-kortrix-launch', 'Acquire kortrix.com', '', 'Completed', 'Normal', 'user-founder', 2, @seed_ts, @seed_ts, @seed_ts),
+  ('task-launch-3', 'proj-kortrix-launch', 'Establish logo and branding', '', 'Completed', 'Normal', 'user-founder', 3, @seed_ts, @seed_ts, @seed_ts),
+  ('task-launch-4', 'proj-kortrix-launch', 'Create social media accounts', '', 'Completed', 'Normal', 'user-founder', 4, @seed_ts, @seed_ts, @seed_ts),
+  ('task-launch-5', 'proj-kortrix-launch', 'Deploy corporate website', '', 'Completed', 'Normal', 'user-founder', 5, @seed_ts, @seed_ts, @seed_ts),
+  ('task-launch-6', 'proj-kortrix-launch', 'Establish Microsoft 365', '', 'Completed', 'Normal', 'user-founder', 6, @seed_ts, @seed_ts, @seed_ts),
+  ('task-launch-7', 'proj-kortrix-launch', 'Create corporate email and shared mailboxes', '', 'Completed', 'Normal', 'user-founder', 7, @seed_ts, @seed_ts, @seed_ts),
+  ('task-launch-8', 'proj-kortrix-launch', 'Finalize website functionality', '', 'Pending', 'Normal', 'user-founder', 8, NULL, @seed_ts, @seed_ts),
+  ('task-launch-9', 'proj-kortrix-launch', 'Configure website form delivery', '', 'Pending', 'Normal', 'user-founder', 9, NULL, @seed_ts, @seed_ts),
+  ('task-launch-10', 'proj-kortrix-launch', 'Complete KORTRIX ONE', '', 'Pending', 'High', 'user-founder', 10, NULL, @seed_ts, @seed_ts),
+  ('task-launch-11', 'proj-kortrix-launch', 'Establish service catalog', '', 'Pending', 'Normal', 'user-founder', 11, NULL, @seed_ts, @seed_ts),
+  ('task-launch-12', 'proj-kortrix-launch', 'Finalize pricing', '', 'Pending', 'High', 'user-founder', 12, NULL, @seed_ts, @seed_ts),
+  ('task-launch-13', 'proj-kortrix-launch', 'Prepare corporate documentation', '', 'Pending', 'Normal', 'user-founder', 13, NULL, @seed_ts, @seed_ts),
+  ('task-launch-14', 'proj-kortrix-launch', 'Prepare customer agreements', '', 'Pending', 'Normal', 'user-founder', 14, NULL, @seed_ts, @seed_ts),
+  ('task-launch-15', 'proj-kortrix-launch', 'Develop marketing materials', '', 'Pending', 'Normal', 'user-founder', 15, NULL, @seed_ts, @seed_ts),
+  ('task-launch-16', 'proj-kortrix-launch', 'Register LLC when funding is available', '', 'Pending', 'Normal', 'user-founder', 16, NULL, @seed_ts, @seed_ts),
+  ('task-launch-17', 'proj-kortrix-launch', 'Obtain business insurance', '', 'Pending', 'Normal', 'user-founder', 17, NULL, @seed_ts, @seed_ts),
+  ('task-launch-18', 'proj-kortrix-launch', 'Establish financial accounts', '', 'Pending', 'Normal', 'user-founder', 18, NULL, @seed_ts, @seed_ts),
+  ('task-launch-19', 'proj-kortrix-launch', 'Prepare official business launch', '', 'Pending', 'Normal', 'user-founder', 19, NULL, @seed_ts, @seed_ts);
+
+-- 8. Official Integrations Registry (8)
+INSERT IGNORE INTO integrations (id, provider_key, name, category, description, status, config_json, updated_at) VALUES
+  ('int-microsoft_entra_id', 'microsoft_entra_id', 'Microsoft Entra ID (SSO)', 'Microsoft 365', 'Enterprise OpenID Connect / OAuth 2.0 sign-in restricted to authorized @kortrix.com Microsoft 365 accounts (Primary: dylan@kortrix.com).', 'Not Configured', '{"primaryAccount":"dylan@kortrix.com","requiredScopes":["openid","profile","email","User.Read"]}', @seed_ts),
+  ('int-outlook_email', 'outlook_email', 'Outlook Email (Microsoft Graph)', 'Microsoft 365', 'Least-privilege transactional email notifications and ticket replies via Microsoft Graph Mail.Send.', 'Not Configured', '{"primaryAccount":"dylan@kortrix.com","requiredScopes":["Mail.Send"]}', @seed_ts),
+  ('int-shared_mailboxes', 'shared_mailboxes', 'Microsoft 365 Shared Mailboxes', 'Microsoft 365', 'Inbound routing for support and operations shared mailboxes into KORTRIX ONE Service Desk.', 'Not Configured', '{"requiredScopes":["Mail.Read.Shared"]}', @seed_ts),
+  ('int-outlook_calendar', 'outlook_calendar', 'Outlook Calendar Sync', 'Microsoft 365', 'Two-way technician appointment and work order scheduling sync via Microsoft Graph Calendars.ReadWrite.', 'Not Configured', '{"requiredScopes":["Calendars.ReadWrite"]}', @seed_ts),
+  ('int-kortrix_public_intake', 'kortrix_public_intake', 'kortrix.com Service Request Intake API', 'Public Website', 'Authenticated write-only endpoint (POST /api/public/service-requests) for incoming website inquiries without exposing internal ticket records.', 'Not Configured', '{"endpoint":"/api/public/service-requests","header":"X-Kortrix-Intake-Key"}', @seed_ts),
+  ('int-cpanel_mysql', 'cpanel_mysql', 'cPanel MySQL / MariaDB Database', 'Infrastructure', 'External relational SQL database connection configured via server-side MYSQL_* environment variables.', 'Connected', '{"activeEngine":"mysql"}', @seed_ts),
+  ('int-stripe_billing', 'stripe_billing', 'Stripe Payment Processing', 'Finance (Planned)', 'Future online invoice payment settlement. Live payment processing is intentionally disabled in this initial release.', 'Unavailable (Planned)', '{}', @seed_ts),
+  ('int-square_pos', 'square_pos', 'Square Payments & POS', 'Finance (Planned)', 'Future on-site residential and commercial payment acceptance. Disabled until LLC and financial accounts are established.', 'Unavailable (Planned)', '{}', @seed_ts);

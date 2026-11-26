@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { db } from '../db.ts';
+import { db, getOwnerConfig } from '../db.ts';
 import {
   createSession,
   hashPassword,
@@ -28,8 +28,12 @@ const changePasswordSchema = z.object({
 // Minimal unauthenticated status — exposes zero database internals or user records
 router.get('/status', async (_req, res) => {
   try {
-    const founder = await db.queryOne<any>('SELECT id, password_hash FROM users WHERE email = ?', ['dylan@kortrix.com']);
-    const envPasscodeSet = Boolean(process.env.OWNER_ADMIN_PASSCODE && process.env.OWNER_ADMIN_PASSCODE.trim().length > 0);
+    const owner = getOwnerConfig();
+    const founder = await db.queryOne<any>(
+      'SELECT id, password_hash FROM users WHERE id = ? OR LOWER(email) = ? LIMIT 1',
+      ['user-founder', owner.email]
+    );
+    const envPasscodeSet = owner.passcode.length > 0;
     const entraConfigured = Boolean(process.env.AZURE_TENANT_ID && process.env.AZURE_CLIENT_ID && process.env.AZURE_CLIENT_SECRET);
     const authConfigured = envPasscodeSet || Boolean(founder?.password_hash) || entraConfigured;
 
@@ -76,12 +80,13 @@ router.post('/login', rateLimit('auth-login', 20, 15 * 60 * 1000), async (req, r
       return;
     }
 
-    const envOwnerPasscode = process.env.OWNER_ADMIN_PASSCODE?.trim();
+    const owner = getOwnerConfig();
+    const isOwnerAccount = user.id === 'user-founder' || email === owner.email;
     let authenticated = false;
 
-    // Configured server-side OWNER_ADMIN_PASSCODE grants Owner access for dylan@kortrix.com
-    if (email === 'dylan@kortrix.com' && envOwnerPasscode) {
-      authenticated = timingSafeStringCompare(parsed.data.password, envOwnerPasscode);
+    // Configured server-side OWNER_ADMIN_PASSCODE grants Owner access
+    if (isOwnerAccount && owner.passcode) {
+      authenticated = timingSafeStringCompare(parsed.data.password, owner.passcode);
     }
     if (!authenticated && user.password_hash) {
       authenticated = verifyPassword(parsed.data.password, user.password_hash);
@@ -137,10 +142,11 @@ router.post('/change-password', requireAuth, async (req, res) => {
       return;
     }
 
-    const envOwnerPasscode = process.env.OWNER_ADMIN_PASSCODE?.trim();
+    const owner = getOwnerConfig();
+    const isOwnerAccount = user.id === 'user-founder' || user.email.toLowerCase() === owner.email;
     let currentValid = false;
-    if (user.email.toLowerCase() === 'dylan@kortrix.com' && envOwnerPasscode) {
-      currentValid = timingSafeStringCompare(parsed.data.currentPassword, envOwnerPasscode);
+    if (isOwnerAccount && owner.passcode) {
+      currentValid = timingSafeStringCompare(parsed.data.currentPassword, owner.passcode);
     }
     if (!currentValid && user.password_hash) {
       currentValid = verifyPassword(parsed.data.currentPassword, user.password_hash);
