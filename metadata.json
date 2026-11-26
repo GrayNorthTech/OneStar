@@ -1,0 +1,6 @@
+{
+  "name": "KORTRIX ONE",
+  "description": "Enterprise internal business management and corporate operations platform for KORTRIX.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
